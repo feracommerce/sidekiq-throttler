@@ -73,8 +73,23 @@ module Sidekiq
       #
       # @return [{String => Float, Integer}]
       def options
-        @options ||= (worker.class.get_sidekiq_options['throttle'] || {}).stringify_keys
+        # Sidekiq Throttler wants to know the throttle options before performing the worker
+        # and Sidekiq is built on the concept that sidekiq options are per class
+        #
+        # We have only one worker class Events::SubscriberWorker for all the subscribers
+        # to be able to execute them in a serial, parallel or tree based order
+        #
+        # so if Throttler calls worker.class.get_sidekiq_options it is going to return the
+        # sidekiq options for Events::SubscriberWorker which are the default options, like { 'queue' => 'default' }
+        #
+        # To avoid sending the scheduled jobs to the default queue, we added a method that workers
+        # can implement or not to return the sidekiq options based on the payload (aka params passed to #perform)
+        @options ||= begin
+          options = worker.class.try(:get_sidekiq_options_for_payload, payload) || worker.class.get_sidekiq_options || {}
+          (options['throttle'] || {}).stringify_keys
+        end
       end
+
 
       ##
       # @return [Integer]
