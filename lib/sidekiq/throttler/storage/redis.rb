@@ -51,6 +51,8 @@ module Sidekiq
             }
 
             loop while prune_one.call(conn.lindex(namespace_key(key), -1))
+
+            conn.expireat(namespace_key(key), 1.day.from_now.to_i) # Expire entries at max 1 day from today.
           end
         end
 
@@ -64,7 +66,11 @@ module Sidekiq
         #   The time to insert
         def append(key, time)
           Sidekiq.redis do |conn|
-            conn.lpush(namespace_key(key), time.to_i)
+            conn.pipelined do
+              res = conn.lpush(namespace_key(key), time.to_i)
+              conn.expireat(namespace_key(key), 1.day.from_now.to_i) # Expire entries at max 1 day from today.
+              res
+            end
           end
         end
 
