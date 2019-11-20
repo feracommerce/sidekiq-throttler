@@ -50,9 +50,7 @@ module Sidekiq
       # then 4 arguments. Because the rate limiter itself always passes four
       # arguments it doesn't work with a lambda.
 
-      worker_options = (worker.class.get_sidekiq_options['throttle'] || {}).stringify_keys
-
-      if worker_options['exceeded'].nil? || worker_options['exceeded'] == :retry
+      if rate_limit.options['exceeded'].nil? || rate_limit.options['exceeded'] == :retry
         rate_limit.exceeded do |delay|
           # Sidekiq is going to run it at the given time
           # partially copied from Sidekiq::Worker#perform_in https://github.com/mperham/sidekiq/blob/4eb54965dc0acf1920d2d0eb8c678b1f77efd0c9/lib/sidekiq/worker.rb#L55
@@ -67,7 +65,7 @@ module Sidekiq
           worker.class.client_push(msg)
         end
       else
-        rate_limit.exceeded &worker_options['exceeded']
+        rate_limit.exceeded &rate_limit.options['exceeded']
       end
 
       rate_limit.execute
